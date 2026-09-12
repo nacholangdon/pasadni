@@ -1,7 +1,15 @@
-import { useState } from 'react';
-import { ShieldCheck, Lock, Info, X, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShieldCheck, Lock, Info, X, Sparkles, Bookmark, Trash2 } from 'lucide-react';
 
-export const Navbar: React.FC = () => {
+interface NavbarProps {
+  savedDniCount?: number;
+  onClearAllSaved?: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({
+  savedDniCount = 0,
+  onClearAllSaved,
+}) => {
   const [showInfoModal, setShowInfoModal] = useState(false);
 
   return (
@@ -26,6 +34,17 @@ export const Navbar: React.FC = () => {
 
           {/* Zero-Trust Badge & Github */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {savedDniCount > 0 && (
+              <button
+                onClick={() => setShowInfoModal(true)}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700/80 text-teal-300 text-xs font-medium cursor-pointer hover:bg-slate-800 transition-colors"
+                title={`${savedDniCount} DNI guardados en este dispositivo`}
+              >
+                <Bookmark className="w-3 h-3 text-teal-400" />
+                <span className="font-mono">{savedDniCount} guardado{savedDniCount > 1 ? 's' : ''}</span>
+              </button>
+            )}
+
             <a
               href="https://github.com/nacholangdon/pasadni"
               target="_blank"
@@ -61,7 +80,7 @@ export const Navbar: React.FC = () => {
           <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setShowInfoModal(false)}
-              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -80,7 +99,7 @@ export const Navbar: React.FC = () => {
               <div className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/50 space-y-2">
                 <div className="flex items-start gap-2.5">
                   <Sparkles className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
-                  <p><strong className="text-white">Cero envíos a servidores:</strong> Tu imagen nunca sale de la memoria de tu navegador. No hay backend ni bases de datos.</p>
+                  <p><strong className="text-white">Cero envíos a servidores:</strong> Tu imagen nunca sale de la memoria de tu navegador. No hay backend ni bases de datos remotas.</p>
                 </div>
                 <div className="flex items-start gap-2.5">
                   <Sparkles className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
@@ -88,12 +107,35 @@ export const Navbar: React.FC = () => {
                 </div>
                 <div className="flex items-start gap-2.5">
                   <Sparkles className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
-                  <p><strong className="text-white">Eliminación de metadatos EXIF:</strong> Al exportar la imagen, se purgan automáticamente las coordenadas GPS, modelo de cámara y fecha original.</p>
+                  <p><strong className="text-white">Almacenamiento local aislado:</strong> Si decidís guardar tu DNI para no tener que escanearlo de nuevo, se guarda únicamente en el almacenamiento interno de tu navegador (IndexedDB).</p>
                 </div>
               </div>
 
+              {savedDniCount > 0 && (
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 text-slate-300">
+                    <Bookmark className="w-4 h-4 text-teal-400" />
+                    <span>{savedDniCount} {savedDniCount === 1 ? 'DNI guardado' : 'DNIs guardados'} en este navegador</span>
+                  </div>
+                  {onClearAllSaved && (
+                    <button
+                      onClick={() => {
+                        if (confirm('¿Seguro que querés borrar todos los DNIs guardados en este navegador?')) {
+                          onClearAllSaved();
+                          setShowInfoModal(false);
+                        }
+                      }}
+                      className="text-red-400 hover:text-red-300 text-[11px] font-medium flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Borrar todos</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
               <p className="text-xs text-slate-400 leading-relaxed">
-                Podés verificarlo abriendo las herramientas de desarrollador (F12) en la pestaña <em>Network</em>: verás que no se realiza ninguna petición HTTP con los datos de tu documento.
+                Podés verificarlo abriendo las herramientas de desarrollador (F12) en la pestaña <em>Network</em>: no se realiza ninguna petición HTTP con imágenes o documentos.
               </p>
             </div>
 

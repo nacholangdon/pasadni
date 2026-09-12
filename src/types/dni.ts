@@ -48,3 +48,16 @@ export interface WorkerMessageResponse {
     progress?: number;
   };
 }
+
+export interface SavedDniRecord {
+  id: string;
+  title: string;
+  side: 'front' | 'back' | 'custom';
+  imageDataUrl: string;
+  thumbnailUrl: string;
+  boxes: CensorBox[];
+  censorStyle: CensorStyle;
+  createdAt: number;
+  updatedAt: number;
+}
+

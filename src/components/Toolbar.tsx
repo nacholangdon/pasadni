@@ -9,7 +9,10 @@ import {
   Grid,
   Droplets,
   Layers,
-  ArrowLeft
+  ArrowLeft,
+  Bookmark,
+  BookmarkCheck,
+  Share2,
 } from 'lucide-react';
 import type { CensorStyle, CensorBox } from '../types/dni';
 
@@ -27,6 +30,8 @@ interface ToolbarProps {
   onOpenExport: () => void;
   onResetImage: () => void;
   boxCount: number;
+  onSaveToDevice?: () => void;
+  isSaved?: boolean;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -43,12 +48,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenExport,
   onResetImage,
   boxCount,
+  onSaveToDevice,
+  isSaved = false,
 }) => {
   return (
     <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xl space-y-3">
       {/* Top Bar: Primary Actions & Export */}
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={onResetImage}
             className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
@@ -67,7 +74,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white text-xs font-semibold flex items-center gap-2 shadow-md shadow-teal-900/20 transition-all cursor-pointer disabled:opacity-50"
           >
             <Wand2 className={`w-3.5 h-3.5 ${isDetecting ? 'animate-spin' : ''}`} />
-            <span>{isDetecting ? 'Detectando con OpenCV...' : 'Auto-detectar'}</span>
+            <span>{isDetecting ? 'Detectando...' : 'Auto-detectar'}</span>
           </button>
 
           {/* Add custom manual box */}
@@ -82,15 +89,41 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <Plus className="w-3.5 h-3.5" />
             <span>{isDrawMode ? 'Dibujá sobre el DNI' : 'Agregar zona'}</span>
           </button>
+
+          {/* Quick save button */}
+          {onSaveToDevice && (
+            <button
+              onClick={onSaveToDevice}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                isSaved
+                  ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60'
+              }`}
+              title="Guardar este DNI en tu navegador de forma segura para usarlo cuando quieras"
+            >
+              {isSaved ? (
+                <>
+                  <BookmarkCheck className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Guardado</span>
+                </>
+              ) : (
+                <>
+                  <Bookmark className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Guardar DNI</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
 
-        {/* Export / Download Safe DNI Button */}
+        {/* Export / Share / Download Safe DNI Button */}
         <button
           onClick={onOpenExport}
-          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition-all cursor-pointer hover:scale-[1.02]"
+          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:from-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition-all cursor-pointer hover:scale-[1.02]"
         >
-          <Download className="w-4 h-4" />
-          <span>Descargar DNI Seguro</span>
+          <Share2 className="w-4 h-4" />
+          <span>Compartir / Descargar</span>
+          <Download className="w-3.5 h-3.5 opacity-75 hidden sm:inline" />
         </button>
       </div>
 

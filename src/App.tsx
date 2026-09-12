@@ -1,13 +1,22 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { HeroDropzone } from './components/HeroDropzone';
 import { CanvasEditor } from './components/CanvasEditor';
 import { Toolbar } from './components/Toolbar';
 import { ExportModal } from './components/ExportModal';
-import type { CensorBox, CensorStyle } from './types/dni';
+import type { CensorBox, CensorStyle, SavedDniRecord } from './types/dni';
 import { useOpenCvWorker } from './hooks/useOpenCvWorker';
 import { loadImageFromFile, extractImageData } from './utils/fileHelpers';
 import { generateSampleDniImage } from './utils/sampleDni';
+import {
+  getAllSavedDnis,
+  deleteSavedDni,
+  clearAllSavedDnis,
+  dataUrlToImage,
+  saveDniRecord,
+  imageToDataUrl,
+  generateThumbnail,
+} from './utils/dniStorage';
 import { Shield, CheckCircle2 } from 'lucide-react';
 
 export function App() {
@@ -18,31 +27,28 @@ export function App() {
   const [isDrawMode, setIsDrawMode] = useState<boolean>(false);
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [detectionNotice, setDetectionNotice] = useState<string | null>(null);
+  const [savedDnis, setSavedDnis] = useState<SavedDniRecord[]>([]);
+  const [isSavedInToolbar, setIsSavedInToolbar] = useState<boolean>(false);
 
   const { status, detectZones } = useOpenCvWorker();
   const isDetecting = status === 'processing';
 
-  // Helper to trigger OpenCV detection on an image
-  const runDetection = useCallback(async (targetImg: HTMLImageElement) => {
+  // Load saved DNIs from IndexedDB on startup
+  const refreshSavedDnis = useCallback(async () => {
     try {
-      const imgData = extractImageData(targetImg, 1000);
-      const result = await detectZones(imgData);
-
-      if (result.boxes && result.boxes.length > 0) {
-        setBoxes(result.boxes);
-        const orientationLabel = result.orientation === 'front' ? 'Frente' : 'Dorso';
-        setDetectionNotice(`Estructura identificada: DNI ${orientationLabel}. Áreas sensibles delimitadas.`);
-        setTimeout(() => setDetectionNotice(null), 5000);
-      }
+      const list = await getAllSavedDnis();
+      setSavedDnis(list);
     } catch (err) {
-      console.warn('Fallo en detección automática, aplicando preset seguro:', err);
-      // Fallback: apply default front boxes
-      applyPreset('front');
+      console.error('Error al cargar DNIs guardados:', err);
     }
-  }, [detectZones]);
+  }, []);
 
-  // Apply predefined box templates
-  const applyPreset = (type: 'front' | 'back') => {
+  useEffect(() => {
+    refreshSavedDnis();
+  }, [refreshSavedDnis]);
+
+  // Apply predefined box templates (declared before runDetection to satisfy linters)
+  const applyPreset = useCallback((type: 'front' | 'back') => {
     if (type === 'front') {
       setBoxes([
         {
@@ -88,8 +94,28 @@ export function App() {
       ]);
       setDetectionNotice('Preset aplicado: Huella Dactilar y Código de Barras');
     }
+    setIsSavedInToolbar(false);
     setTimeout(() => setDetectionNotice(null), 4000);
-  };
+  }, []);
+
+  // Helper to trigger OpenCV detection on an image
+  const runDetection = useCallback(async (targetImg: HTMLImageElement) => {
+    try {
+      const imgData = extractImageData(targetImg, 1000);
+      const result = await detectZones(imgData);
+
+      if (result.boxes && result.boxes.length > 0) {
+        setBoxes(result.boxes);
+        const orientationLabel = result.orientation === 'front' ? 'Frente' : 'Dorso';
+        setDetectionNotice(`Estructura identificada: DNI ${orientationLabel}. Áreas sensibles delimitadas.`);
+        setTimeout(() => setDetectionNotice(null), 5000);
+      }
+    } catch (err) {
+      console.warn('Fallo en detección automática, aplicando preset seguro:', err);
+      // Fallback: apply default front boxes
+      applyPreset('front');
+    }
+  }, [detectZones, applyPreset]);
 
   // Handle image upload from input or camera
   const handleImageSelected = async (file: File) => {
@@ -97,6 +123,7 @@ export function App() {
       const loadedImg = await loadImageFromFile(file);
       setImage(loadedImg);
       setSelectedBoxId(null);
+      setIsSavedInToolbar(false);
       await runDetection(loadedImg);
     } catch (err: any) {
       alert(err?.message || 'Error al cargar la imagen');
@@ -109,9 +136,90 @@ export function App() {
       const sampleImg = await generateSampleDniImage();
       setImage(sampleImg);
       setSelectedBoxId(null);
+      setIsSavedInToolbar(false);
       await runDetection(sampleImg);
     } catch (err: any) {
       alert('Error al generar imagen de muestra: ' + err?.message);
+    }
+  };
+
+  // Load a locally stored DNI into the editor
+  const handleLoadSavedDni = async (record: SavedDniRecord) => {
+    try {
+      const loadedImg = await dataUrlToImage(record.imageDataUrl);
+      setImage(loadedImg);
+      setBoxes(record.boxes);
+      setCensorStyle(record.censorStyle || 'solid');
+      setSelectedBoxId(null);
+      setIsSavedInToolbar(true);
+      setDetectionNotice(`DNI "${record.title}" cargado desde almacenamiento seguro.`);
+      setTimeout(() => setDetectionNotice(null), 4000);
+    } catch (err: any) {
+      alert('Error al abrir el DNI guardado: ' + err?.message);
+    }
+  };
+
+  // Quick share a locally stored DNI (loads and opens modal in 1 click)
+  const handleQuickShareSavedDni = async (record: SavedDniRecord) => {
+    try {
+      const loadedImg = await dataUrlToImage(record.imageDataUrl);
+      setImage(loadedImg);
+      setBoxes(record.boxes);
+      setCensorStyle(record.censorStyle || 'solid');
+      setSelectedBoxId(null);
+      setIsSavedInToolbar(true);
+      setIsExportOpen(true);
+    } catch (err: any) {
+      alert('Error al abrir para compartir: ' + err?.message);
+    }
+  };
+
+  // Delete a saved DNI from IndexedDB
+  const handleDeleteSavedDni = async (id: string) => {
+    try {
+      await deleteSavedDni(id);
+      await refreshSavedDnis();
+    } catch (err: any) {
+      alert('Error al eliminar DNI: ' + err?.message);
+    }
+  };
+
+  // Clear all saved DNIs (Zero-Trust full purge)
+  const handleClearAllSaved = async () => {
+    try {
+      await clearAllSavedDnis();
+      await refreshSavedDnis();
+      setDetectionNotice('Se han eliminado todos los documentos guardados en este dispositivo.');
+      setTimeout(() => setDetectionNotice(null), 4000);
+    } catch (err: any) {
+      alert('Error al vaciar datos locales: ' + err?.message);
+    }
+  };
+
+  // Quick save currently loaded DNI into IndexedDB
+  const handleSaveCurrentDni = async () => {
+    if (!image) return;
+    try {
+      const rawDataUrl = imageToDataUrl(image);
+      const thumbUrl = generateThumbnail(image, 340);
+      const isBack = boxes.some((b) => b.type === 'huella' || b.type === 'mrz');
+      const title = isBack ? 'DNI Dorso' : 'DNI Frente';
+
+      await saveDniRecord({
+        title,
+        side: isBack ? 'back' : 'front',
+        imageDataUrl: rawDataUrl,
+        thumbnailUrl: thumbUrl,
+        boxes,
+        censorStyle,
+      });
+
+      setIsSavedInToolbar(true);
+      await refreshSavedDnis();
+      setDetectionNotice(`¡Guardado en este navegador como "${title}"!`);
+      setTimeout(() => setDetectionNotice(null), 4000);
+    } catch (err: any) {
+      alert('Error al guardar en el dispositivo: ' + err?.message);
     }
   };
 
@@ -120,6 +228,7 @@ export function App() {
     if (!selectedBoxId) return;
     setBoxes((prev) => prev.filter((b) => b.id !== selectedBoxId));
     setSelectedBoxId(null);
+    setIsSavedInToolbar(false);
   };
 
   // Clear all boxes
@@ -128,7 +237,13 @@ export function App() {
     if (confirm('¿Querés eliminar todas las zonas censuradas?')) {
       setBoxes([]);
       setSelectedBoxId(null);
+      setIsSavedInToolbar(false);
     }
+  };
+
+  const handleBoxesChange = (newBoxes: CensorBox[]) => {
+    setBoxes(newBoxes);
+    setIsSavedInToolbar(false);
   };
 
   const selectedBox = boxes.find((b) => b.id === selectedBoxId) || null;
@@ -136,15 +251,22 @@ export function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* Navigation */}
-      <Navbar />
+      <Navbar
+        savedDniCount={savedDnis.length}
+        onClearAllSaved={handleClearAllSaved}
+      />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 py-6 sm:py-8 flex flex-col">
         {!image ? (
-          /* Initial Screen: Dropzone, Camera & Explanations */
+          /* Initial Screen: Saved Documents, Dropzone, Camera & Explanations */
           <HeroDropzone
             onImageSelected={handleImageSelected}
             onLoadSample={handleLoadSample}
+            onLoadSavedDni={handleLoadSavedDni}
+            onQuickShareSavedDni={handleQuickShareSavedDni}
+            savedDnis={savedDnis}
+            onDeleteSavedDni={handleDeleteSavedDni}
             isLoading={isDetecting}
           />
         ) : (
@@ -175,15 +297,18 @@ export function App() {
                 setImage(null);
                 setBoxes([]);
                 setSelectedBoxId(null);
+                setIsSavedInToolbar(false);
               }}
               boxCount={boxes.length}
+              onSaveToDevice={handleSaveCurrentDni}
+              isSaved={isSavedInToolbar}
             />
 
             {/* Canvas Editor */}
             <CanvasEditor
               image={image}
               boxes={boxes}
-              onBoxesChange={setBoxes}
+              onBoxesChange={handleBoxesChange}
               censorStyle={censorStyle}
               isDrawMode={isDrawMode}
               onDrawModeChange={setIsDrawMode}
@@ -212,6 +337,7 @@ export function App() {
             image={image}
             boxes={boxes}
             censorStyle={censorStyle}
+            onSavedChange={refreshSavedDnis}
           />
         )}
       </main>

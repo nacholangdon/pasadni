@@ -79,3 +79,98 @@ export function formatBytes(bytes: number, decimals = 1): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
+
+/**
+ * Checks if the browser supports sharing files via Web Share API
+ */
+export function canShareFiles(): boolean {
+  if (typeof navigator === 'undefined' || !navigator.share || !navigator.canShare) {
+    return false;
+  }
+  try {
+    const testFile = new File(['test'], 'test.png', { type: 'image/png' });
+    return navigator.canShare({ files: [testFile] });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Shares an image file using the Web Share API (native mobile/desktop share sheet)
+ */
+export async function shareImageFile(
+  blob: Blob,
+  filename: string,
+  title = 'DNI Seguro',
+  text = 'Te comparto mi DNI con datos sensibles protegidos (procesado con PasaDNI).'
+): Promise<boolean> {
+  if (!canShareFiles()) return false;
+  const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+  await navigator.share({
+    title,
+    text,
+    files: [file],
+  });
+  return true;
+}
+
+/**
+ * Converts a Blob to image/png (required by most browser Clipboard APIs)
+ */
+function convertBlobToPng(blob: Blob): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        reject(new Error('No se pudo crear el contexto para convertir a PNG.'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((b) => {
+        if (b) resolve(b);
+        else reject(new Error('Fallo al generar PNG.'));
+      }, 'image/png');
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Fallo al decodificar blob para el portapapeles.'));
+    };
+    img.src = url;
+  });
+}
+
+/**
+ * Copies an image Blob to the system clipboard
+ */
+export async function copyImageToClipboard(blob: Blob): Promise<void> {
+  if (!navigator.clipboard || !window.ClipboardItem) {
+    throw new Error('El portapapeles de imágenes no está soportado en este navegador.');
+  }
+
+  const pngBlob = blob.type === 'image/png' ? blob : await convertBlobToPng(blob);
+  const item = new ClipboardItem({ 'image/png': pngBlob });
+  await navigator.clipboard.write([item]);
+}
+
+/**
+ * URL schemes for sharing
+ */
+export function getWhatsAppShareUrl(text: string): string {
+  return `https://wa.me/?text=${encodeURIComponent(text)}`;
+}
+
+export function getTelegramShareUrl(text: string, url = 'https://nacholangdon.pages.dev'): string {
+  return `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+}
+
+export function getEmailShareUrl(subject: string, body: string): string {
+  return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
