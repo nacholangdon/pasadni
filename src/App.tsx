@@ -217,15 +217,31 @@ export function App() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto border-t border-slate-900 bg-slate-950/90 py-6 text-center text-xs text-slate-500">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>
-            PasaDNI — Herramienta de privacidad de código abierto. Desarrollado con tecnología 100% en el cliente.
+      <footer className="mt-auto border-t border-slate-900 bg-slate-950/90 py-6 text-xs text-slate-500">
+        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <p className="flex items-center justify-center sm:justify-start gap-1.5 flex-wrap">
+            <span>PasaDNI — Herramienta de privacidad de código abierto.</span>
+            <span>Desarrollado por</span>
+            <a
+              href="https://nacholangdon.pages.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-teal-400 hover:text-teal-300 font-semibold underline underline-offset-2 decoration-teal-500/40 hover:decoration-teal-400 transition-colors inline-flex items-center gap-1"
+            >
+              Nacho Langdon
+            </a>
           </p>
-          <div className="flex items-center gap-3">
-            <span className="text-slate-400">Cloudflare Pages Ready</span>
+          <div className="flex items-center justify-center gap-3 text-slate-400">
+            <span>100% Client-Side</span>
             <span>·</span>
-            <span className="text-slate-400">OpenCV.js Web Workers</span>
+            <a
+              href="https://nacholangdon.pages.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-teal-400 transition-colors font-mono"
+            >
+              nacholangdon.pages.dev
+            </a>
           </div>
         </div>
       </footer>
