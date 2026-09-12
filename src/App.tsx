@@ -358,6 +358,10 @@ export function App() {
             </a>
           </p>
           <div className="flex items-center justify-center gap-3 text-slate-400">
+            <span className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 font-mono text-[11px] text-teal-400 font-medium shadow-sm">
+              v1.1.0
+            </span>
+            <span>·</span>
             <span>100% Client-Side</span>
             <span>·</span>
             <a
